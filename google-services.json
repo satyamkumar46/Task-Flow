@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "502199329090",
+    "project_id": "taskmanagement-e4b59",
+    "storage_bucket": "taskmanagement-e4b59.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:502199329090:android:3d5d2c58cd28bb12b168db",
+        "android_client_info": {
+          "package_name": "com.sksatyam.TaskFlow"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "502199329090-ei2vku24kfg71g427e39d715ada6tltf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sksatyam.TaskFlow",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "502199329090-v0rfo4p7jbvdvkth1jr6j176eksv8mlo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBLHCP599f4Sb7DzkJrEcEcAJT4W6TeJs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "502199329090-u2phpj5hgndhdphadhjape1oeem901av.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "502199329090-g80f9bjrq04o5uq9jqn4avdebua9g69d.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.sksatyam.TaskFlow"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
