@@ -20,8 +20,12 @@ export const userSlice = createSlice({
     updateAvatar: (state, action: PayloadAction<string>) => {
       state.avatarKey = action.payload;
     },
+    resetUser: (state) => {
+      state.name = initialState.name;
+      state.avatarKey = initialState.avatarKey;
+    },
   },
 });
 
-export const { updateName, updateAvatar } = userSlice.actions;
+export const { updateName, updateAvatar, resetUser } = userSlice.actions;
 export default userSlice.reducer;

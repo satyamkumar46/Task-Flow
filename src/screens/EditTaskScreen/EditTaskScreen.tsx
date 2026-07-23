@@ -1,24 +1,25 @@
-import React, { useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSelector, useDispatch } from 'react-redux';
+import Svg, { Path, Rect } from 'react-native-svg';
+import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../Store';
-import { editTask as editTaskAction, deleteTask as deleteTaskAction } from '../../Store/tasksSlice';
-import { updateTask as updateTaskInFirestore, deleteTask as deleteTaskFromFirestore } from '../../service/taskService';
+import { deleteTask as deleteTaskAction, editTask as editTaskAction } from '../../Store/tasksSlice';
 import Colors from '../../constants/colors';
+import { deleteTask as deleteTaskFromFirestore, updateTask as updateTaskInFirestore } from '../../service/taskService';
 
 const { width } = Dimensions.get('window');
 
@@ -34,9 +35,11 @@ export default function EditTaskScreen() {
 
   const { avatarKey } = useSelector((state: RootState) => state.user);
 
-  const avatar = avatarKey === 'profile_avatar'
-    ? require('../../../assets/images/profile_avatar.png')
-    : require('../../../assets/images/avatar.png');
+  const avatar = avatarKey.startsWith('http') || avatarKey.startsWith('file') || avatarKey.startsWith('content')
+    ? { uri: avatarKey }
+    : avatarKey === 'profile_avatar'
+      ? require('../../../assets/images/profile_avatar.png')
+      : require('../../../assets/images/avatar.png');
 
   if (!task) {
     return (
@@ -76,46 +79,98 @@ export default function EditTaskScreen() {
       if (parts.length === 3) {
         return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
       }
-    } catch (e) {}
+    } catch (e) { }
     return new Date();
   };
 
-  const dateOptions = [
-    { label: 'Today', date: new Date() },
-    { label: 'Tomorrow', date: new Date(Date.now() + 24 * 60 * 60 * 1000) },
-    { label: 'Next Monday', date: (() => {
-        const d = new Date();
-        d.setDate(d.getDate() + ((1 + 7 - d.getDay()) % 7 || 7));
-        return d;
-      })()
-    }
-  ];
-
   const initialDate = parseTaskDate(task.date);
-  const matchedIndex = dateOptions.findIndex(
-    (opt) => getLocalDateKey(opt.date) === getLocalDateKey(initialDate)
-  );
-
-  const [dateIndex, setDateIndex] = useState(matchedIndex !== -1 ? matchedIndex : 0);
   const [taskDate, setTaskDate] = useState<Date>(initialDate);
-
-  const timeOptions = ['09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '04:30 PM', '06:00 PM'];
-  const matchedTimeIndex = timeOptions.indexOf(task.time);
-
-  const [timeIndex, setTimeIndex] = useState(matchedTimeIndex !== -1 ? matchedTimeIndex : 1);
   const [taskTime, setTaskTime] = useState(task.time);
 
+  // Modals Visibility
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [isTimeVisible, setIsTimeVisible] = useState(false);
+  const [isCategoryVisible, setIsCategoryVisible] = useState(false);
+
+  // Calendar Modal States
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date(initialDate));
+
+  // Time Modal States
+  const [selectedHour, setSelectedHour] = useState('10');
+  const [selectedMinute, setSelectedMinute] = useState('00');
+  const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM'>('AM');
+
   const handleDatePress = () => {
-    const nextIndex = (dateIndex + 1) % dateOptions.length;
-    setDateIndex(nextIndex);
-    setTaskDate(dateOptions[nextIndex].date);
+    setCurrentMonth(new Date(taskDate));
+    setIsCalendarVisible(true);
   };
 
   const handleTimePress = () => {
-    const nextIndex = (timeIndex + 1) % timeOptions.length;
-    setTimeIndex(nextIndex);
-    setTaskTime(timeOptions[nextIndex]);
+    try {
+      const parts = taskTime.split(' ');
+      const timeParts = parts[0].split(':');
+      setSelectedHour(timeParts[0]);
+      setSelectedMinute(timeParts[1]);
+      setSelectedPeriod(parts[1] as 'AM' | 'PM');
+    } catch (e) {
+      console.log(e);
+    }
+    setIsTimeVisible(true);
   };
+
+  const handleSaveTime = () => {
+    setTaskTime(`${selectedHour}:${selectedMinute} ${selectedPeriod}`);
+    setIsTimeVisible(false);
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
+
+  // Monthly grid calculations for Calendar Modal
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+
+  const firstDay = new Date(year, month, 1);
+  const firstDayOfWeek = firstDay.getDay(); // 0 (Sun) to 6 (Sat)
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const prevMonthTotalDays = new Date(year, month, 0).getDate();
+
+  const gridItems = [];
+  // Previous month padding days
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+    gridItems.push({
+      num: prevMonthTotalDays - i,
+      isCurrentMonth: false,
+      dateObj: new Date(year, month - 1, prevMonthTotalDays - i)
+    });
+  }
+  // Current month days
+  for (let i = 1; i <= totalDays; i++) {
+    gridItems.push({
+      num: i,
+      isCurrentMonth: true,
+      dateObj: new Date(year, month, i)
+    });
+  }
+  // Next month padding days
+  const remainingCells = 42 - gridItems.length;
+  for (let i = 1; i <= remainingCells; i++) {
+    gridItems.push({
+      num: i,
+      isCurrentMonth: false,
+      dateObj: new Date(year, month + 1, i)
+    });
+  }
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   const handleUpdate = async () => {
     if (!title.trim()) return;
@@ -173,17 +228,7 @@ export default function EditTaskScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Task</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.trashButton} onPress={handleDelete} activeOpacity={0.7}>
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                stroke="#374151"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </TouchableOpacity>
+
           <Image source={avatar} style={styles.headerAvatar} />
         </View>
       </View>
@@ -268,82 +313,11 @@ export default function EditTaskScreen() {
             </Svg>
           </TouchableOpacity>
 
-          {/* Collaborators Card */}
-          <View style={styles.detailsCard}>
-            <View style={styles.collaboratorsHeader}>
-              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" style={styles.collaboratorsIcon}>
-                <Path
-                  d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m16-10a4 4 0 11-8 0 4 4 0 018 0zm3 10v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"
-                  stroke="#312E81"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </Svg>
-              <Text style={styles.collaboratorsTitle}>Collaborators</Text>
-            </View>
-
-            <View style={styles.collabRow}>
-              {/* Sarah K. Pill */}
-              <View style={styles.collabPill}>
-                <Image
-                  source={require('../../../assets/images/avatar.png')}
-                  style={styles.collabAvatar}
-                />
-                <Text style={styles.collabText}>Sarah K.</Text>
-                <TouchableOpacity style={styles.collabDismiss} activeOpacity={0.6}>
-                  <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M6 18L18 6M6 6l12 12"
-                      stroke="#4F46E5"
-                      strokeWidth={2.5}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
-                </TouchableOpacity>
-              </View>
-
-              {/* Marcus V. Pill */}
-              <View style={styles.collabPill}>
-                <Image
-                  source={require('../../../assets/images/profile_avatar.png')}
-                  style={styles.collabAvatar}
-                />
-                <Text style={styles.collabText}>Marcus V.</Text>
-                <TouchableOpacity style={styles.collabDismiss} activeOpacity={0.6}>
-                  <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M6 18L18 6M6 6l12 12"
-                      stroke="#4F46E5"
-                      strokeWidth={2.5}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
-                </TouchableOpacity>
-              </View>
-
-              {/* Add Button */}
-              <TouchableOpacity style={styles.addButtonCircle} activeOpacity={0.7}>
-                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                  <Path
-                    d="M12 5v14M5 12h14"
-                    stroke="#94A3B8"
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </Svg>
-              </TouchableOpacity>
-            </View>
-          </View>
-
           {/* Priority & Category Container */}
           <View style={styles.priorityCategoryContainer}>
             {/* Priority */}
             <Text style={styles.blockLabel}>PRIORITY</Text>
-            
+
             {/* High Option */}
             <TouchableOpacity
               style={styles.priorityOption}
@@ -406,11 +380,7 @@ export default function EditTaskScreen() {
             <TouchableOpacity
               style={styles.dropdownBox}
               activeOpacity={0.8}
-              onPress={() => {
-                const categories = ['Work', 'Personal', 'Study', 'Health', 'Finance'];
-                const nextIndex = (categories.indexOf(category) + 1) % categories.length;
-                setCategory(categories[nextIndex]);
-              }}
+              onPress={() => setIsCategoryVisible(true)}
             >
               <Text style={styles.dropdownVal}>{category}</Text>
               <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -443,7 +413,7 @@ export default function EditTaskScreen() {
         <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()} activeOpacity={0.6}>
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.updateButton} onPress={handleUpdate} activeOpacity={0.85}>
           <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" style={styles.updateIcon}>
             <Path
@@ -457,6 +427,223 @@ export default function EditTaskScreen() {
           <Text style={styles.updateText}>Update Task</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Calendar Modal */}
+      <Modal
+        visible={isCalendarVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCalendarVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setIsCalendarVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Date</Text>
+              <TouchableOpacity onPress={() => setIsCalendarVisible(false)} style={styles.modalCloseButton}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.text} strokeWidth={2.5} strokeLinecap="round" />
+                </Svg>
+              </TouchableOpacity>
+            </View>
+
+            {/* Month Navigation */}
+            <View style={styles.monthNav}>
+              <TouchableOpacity onPress={handlePrevMonth} style={styles.navButton}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path d="M15 19l-7-7 7-7" stroke={Colors.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+              <Text style={styles.monthLabel}>{monthNames[month]} {year}</Text>
+              <TouchableOpacity onPress={handleNextMonth} style={styles.navButton}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path d="M9 5l7 7-7 7" stroke={Colors.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
+            </View>
+
+            {/* Weekdays Header */}
+            <View style={styles.weekdaysRow}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                <Text key={idx} style={styles.weekdayText}>{day}</Text>
+              ))}
+            </View>
+
+            {/* Days Grid */}
+            <View style={styles.daysGrid}>
+              {gridItems.map((item, idx) => {
+                const isSelected = getLocalDateKey(item.dateObj) === getLocalDateKey(taskDate);
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    disabled={!item.isCurrentMonth}
+                    onPress={() => {
+                      setTaskDate(item.dateObj);
+                      setIsCalendarVisible(false);
+                    }}
+                    style={[
+                      styles.dayButton,
+                      !item.isCurrentMonth && styles.dayButtonInactive,
+                      isSelected && styles.dayButtonSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dayText,
+                        !item.isCurrentMonth && styles.dayTextInactive,
+                        isSelected && styles.dayTextSelected,
+                      ]}
+                    >
+                      {item.num}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Time Picker Modal */}
+      <Modal
+        visible={isTimeVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsTimeVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setIsTimeVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Time</Text>
+              <TouchableOpacity onPress={() => setIsTimeVisible(false)} style={styles.modalCloseButton}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.text} strokeWidth={2.5} strokeLinecap="round" />
+                </Svg>
+              </TouchableOpacity>
+            </View>
+
+            {/* Time Picker Layout */}
+            <View style={styles.timePickerContainer}>
+              {/* Hours */}
+              <View style={styles.timeColumn}>
+                <Text style={styles.timeColumnLabel}>Hour</Text>
+                <ScrollView showsVerticalScrollIndicator={false} style={styles.timeScrollView} contentContainerStyle={styles.timeScrollContent}>
+                  {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                    <TouchableOpacity
+                      key={h}
+                      onPress={() => setSelectedHour(h)}
+                      style={[styles.timeSelectBtn, selectedHour === h && styles.timeSelectBtnActive]}
+                    >
+                      <Text style={[styles.timeSelectText, selectedHour === h && styles.timeSelectTextActive]}>{h}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <Text style={styles.timeDivider}>:</Text>
+
+              {/* Minutes */}
+              <View style={styles.timeColumn}>
+                <Text style={styles.timeColumnLabel}>Min</Text>
+                <ScrollView showsVerticalScrollIndicator={false} style={styles.timeScrollView} contentContainerStyle={styles.timeScrollContent}>
+                  {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      onPress={() => setSelectedMinute(m)}
+                      style={[styles.timeSelectBtn, selectedMinute === m && styles.timeSelectBtnActive]}
+                    >
+                      <Text style={[styles.timeSelectText, selectedMinute === m && styles.timeSelectTextActive]}>{m}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* AM/PM */}
+              <View style={styles.periodColumn}>
+                {(['AM', 'PM'] as const).map((period) => (
+                  <TouchableOpacity
+                    key={period}
+                    onPress={() => setSelectedPeriod(period)}
+                    style={[styles.periodBtn, selectedPeriod === period && styles.periodBtnActive]}
+                  >
+                    <Text style={[styles.periodBtnText, selectedPeriod === period && styles.periodBtnTextActive]}>{period}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <TouchableOpacity onPress={handleSaveTime} style={styles.modalDoneButton} activeOpacity={0.8}>
+              <Text style={styles.modalDoneButtonText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Category Picker Modal */}
+      <Modal
+        visible={isCategoryVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCategoryVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setIsCategoryVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Category</Text>
+              <TouchableOpacity onPress={() => setIsCategoryVisible(false)} style={styles.modalCloseButton}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <Path d="M18 6L6 18M6 6l12 12" stroke={Colors.text} strokeWidth={2.5} strokeLinecap="round" />
+                </Svg>
+              </TouchableOpacity>
+            </View>
+
+            {/* Category Options */}
+            <View style={{ gap: 12, marginBottom: 20 }}>
+              {(['Work', 'Personal', 'Study', 'Health', 'Finance'] as const).map((cat) => {
+                const isSelected = category === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => {
+                      setCategory(cat);
+                      setIsCategoryVisible(false);
+                    }}
+                    style={[
+                      styles.categoryOptionBtn,
+                      isSelected && styles.categoryOptionBtnActive
+                    ]}
+                  >
+                    <Text style={[
+                      styles.categoryOptionText,
+                      isSelected && styles.categoryOptionTextActive
+                    ]}>{cat}</Text>
+                    {isSelected && (
+                      <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                        <Path d="M5 13l4 4L19 7" stroke={Colors.primary} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -789,5 +976,222 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 40,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  // Calendar specific styles
+  monthNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 8,
+  },
+  navButton: {
+    padding: 8,
+  },
+  monthLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  weekdaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  weekdayText: {
+    width: (width - 48) / 7,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.secondaryText,
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+  },
+  dayButton: {
+    width: (width - 64) / 7,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  dayButtonInactive: {
+    opacity: 0,
+  },
+  dayButtonSelected: {
+    backgroundColor: Colors.primary,
+  },
+  dayText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  dayTextInactive: {
+    color: Colors.secondaryText,
+  },
+  dayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  // Time Picker specific styles
+  timePickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 180,
+    gap: 16,
+    marginBottom: 24,
+  },
+  timeColumn: {
+    width: 80,
+    height: '100%',
+    alignItems: 'center',
+  },
+  timeColumnLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.secondaryText,
+    marginBottom: 8,
+  },
+  timeScrollView: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  timeScrollContent: {
+    paddingVertical: 10,
+  },
+  timeSelectBtn: {
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  timeSelectBtnActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  timeSelectText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  timeSelectTextActive: {
+    color: Colors.primary,
+    fontWeight: '800',
+  },
+  timeDivider: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.secondaryText,
+    paddingTop: 16,
+  },
+  periodColumn: {
+    justifyContent: 'center',
+    gap: 12,
+    height: '100%',
+    paddingTop: 20,
+  },
+  periodBtn: {
+    width: 60,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  periodBtnActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  periodBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.secondaryText,
+  },
+  periodBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  modalDoneButton: {
+    backgroundColor: Colors.primary,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  modalDoneButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  categoryOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 20,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  categoryOptionBtnActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: Colors.primary,
+  },
+  categoryOptionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  categoryOptionTextActive: {
+    color: Colors.primary,
   },
 });

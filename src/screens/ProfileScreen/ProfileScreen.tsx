@@ -14,8 +14,9 @@ import Svg, { Path } from 'react-native-svg';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../Store';
 import Colors from '../../constants/colors';
-import { updateAvatar } from '../../Store/userSlice';
+import { updateAvatar, resetUser } from '../../Store/userSlice';
 import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../../service/authContext';
 
 const { width } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ export default function ProfileScreen() {
   const dispatch = useDispatch();
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
   const { name, avatarKey } = useSelector((state: RootState) => state.user);
+  const { logout } = useAuth();
   
   const avatar = avatarKey.startsWith('http') || avatarKey.startsWith('file') || avatarKey.startsWith('content')
     ? { uri: avatarKey }
@@ -34,9 +36,15 @@ export default function ProfileScreen() {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
 
-  const handleLogout = () => {
-    // Navigate back to the Auth screen (which restarts the auth flow)
-    navigation.replace('Auth');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      dispatch(resetUser());
+      // Navigate back to the Auth screen (which restarts the auth flow)
+      navigation.replace('Auth');
+    } catch (e) {
+      console.error('Error logging out:', e);
+    }
   };
 
   const pickImage = async () => {
