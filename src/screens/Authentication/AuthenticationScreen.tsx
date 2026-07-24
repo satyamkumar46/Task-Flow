@@ -1,28 +1,28 @@
-import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
   Dimensions,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle, G } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
+import Svg, { Path } from 'react-native-svg';
 import { useDispatch } from 'react-redux';
 import { updateName } from '../../Store/userSlice';
-import { useAuth } from '../../service/authContext';
 import Colors from '../../constants/colors';
+import { useAuth } from '../../service/authContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function AuthenticationScreen() {
   const [isLogin, setIsLogin] = useState(true);
-  
+
   // Form fields state
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -234,7 +234,7 @@ export default function AuthenticationScreen() {
                 </View>
 
                 {/* Forgot Password Link */}
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.forgotPasswordContainer}
                   onPress={() => navigation.navigate('ForgotPassword')}
                   activeOpacity={0.7}
@@ -509,8 +509,8 @@ export default function AuthenticationScreen() {
                 {/* Social Icons (Google, Apple) */}
                 <View style={styles.socialButtonsRow}>
                   {/* Google */}
-                  <TouchableOpacity 
-                    style={styles.socialCircle} 
+                  <TouchableOpacity
+                    style={styles.socialCircle}
                     activeOpacity={0.7}
                     onPress={handleGoogleLogin}
                     disabled={isSubmitting}

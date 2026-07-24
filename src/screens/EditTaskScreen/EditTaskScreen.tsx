@@ -4,6 +4,7 @@ import {
   Dimensions,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,7 +12,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -435,9 +435,9 @@ export default function EditTaskScreen() {
         animationType="fade"
         onRequestClose={() => setIsCalendarVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setIsCalendarVisible(false)}
         >
           <View style={styles.modalContent}>
@@ -515,9 +515,9 @@ export default function EditTaskScreen() {
         animationType="fade"
         onRequestClose={() => setIsTimeVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setIsTimeVisible(false)}
         >
           <View style={styles.modalContent}>
@@ -596,9 +596,9 @@ export default function EditTaskScreen() {
         animationType="fade"
         onRequestClose={() => setIsCategoryVisible(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setIsCategoryVisible(false)}
         >
           <View style={styles.modalContent}>
